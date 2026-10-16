@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>အလုပ်ချိန်နှင့် OT မှတ်တမ်းစနစ်</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="bg-slate-100 font-sans min-h-screen p-4">
+
+    <div class="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden md:max-w-lg p-6 mt-4">
+        <h2 class="text-2xl font-bold text-center text-indigo-600 mb-6">အလုပ်ချိန် & OT မှတ်တမ်း</h2>
+
+        <!-- Input Form -->
+        <form id="attendanceForm" class="space-y-4">
+            <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">ရက်စွဲ</label>
+                <input type="date" id="recordDate" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+            </div>
+
+            <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">လုပ်ကိုင်ခဲ့သည့် စုစုပေါင်းနာရီ (၈ နာရီအထက်ဆို OT တွက်ပေးမည်)</label>
+                <input type="number" step="0.5" id="workHours" placeholder="ဥပမာ - 10" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+            </div>
+
+            <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 transition duration-200">
+                မှတ်တမ်းတင်မည်
+            </button>
+        </form>
+
+        <!-- Summary Section -->
+        <div class="mt-6 p-4 bg-indigo-50 rounded-lg flex justify-between items-center">
+            <span class="text-gray-700 font-semibold">စုစုပေါင်း OT နာရီ:</span>
+            <span id="totalOtDisplay" class="text-xl font-bold text-indigo-600">0 နာရီ</span>
+        </div>
+
+        <!-- Records List -->
+        <div class="mt-6">
+            <h3 class="text-lg font-bold text-gray-800 mb-3">မှတ်တမ်းဟောင်းများ</h3>
+            <div class="overflow-x-auto max-h-60 overflow-y-auto border rounded-lg">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-100 text-gray-600 text-sm">
+                            <th class="p-2 border-b">ရက်စွဲ</th>
+                            <th class="p-2 border-b">စုစုပေါင်း</th>
+                            <th class="p-2 border-b">OT</th>
+                            <th class="p-2 border-b text-center">လုပ်ဆောင်ချက်</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recordTableBody" class="text-sm text-gray-700">
+                        <!-- JavaScript မှတဆင့် ဝင်ရောက်လာမည် -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Logic -->
+    <script>
+        // ယနေ့ရက်စွဲကို Default ထည့်ရန်
+        document.getElementById('recordDate').valueAsDate = new Date();
+
+        // LocalStorage မှ Data များ ထုတ်ယူရန်
+        let records = JSON.parse(localStorage.getItem('work_records')) || [];
+
+        const form = document.getElementById('attendanceForm');
+        const recordTableBody = document.getElementById('recordTableBody');
+        const totalOtDisplay = document.getElementById('totalOtDisplay');
+
+        // စာရင်းပြသရန် Function
+        function renderRecords() {
+            recordTableBody.innerHTML = '';
+            let totalOt = 0;
+
+            if (records.length === 0) {
+                recordTableBody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-gray-400">မှတ်တမ်း မရှိသေးပါ။</td></tr>`;
+                totalOtDisplay.innerText = `0 နာရီ`;
+                return;
+            }
+
+            records.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            records.forEach((rec, index) => {
+                totalOt += rec.ot;
+                const row = document.createElement('tr');
+                row.className = "border-b hover:bg-gray-50";
+                row.innerHTML = `
+                    <td class="p-2">${rec.date}</td>
+                    <td class="p-2">${rec.total} နာရီ</td>
+                    <td class="p-2 font-semibold text-indigo-600">${rec.ot} နာရီ</td>
+                    <td class="p-2 text-center">
+                        <button onclick="deleteRecord(${index})" class="text-red-500 hover:text-red-700 font-bold px-2 py-1 rounded">ဖျက်ရန်</button>
+                    </td>
+                `;
+                recordTableBody.appendChild(row);
+            });
+
+            totalOtDisplay.innerText = `${totalOt} နာရီ`;
+        }
+
+        // Form တင်လိုက်သည့်အခါ
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const date = document.getElementById('recordDate').value;
+            const totalHours = parseFloat(document.getElementById('workHours').value);
+            
+            const standardHours = 8.0;
+            let otHours = totalHours > standardHours ? totalHours - standardHours : 0;
+
+            const newRecord = {
+                date: date,
+                total: totalHours,
+                ot: otHours
+            };
+
+            records.push(newRecord);
+            localStorage.setItem('work_records', JSON.stringify(records));
+            
+            form.reset();
+            document.getElementById('recordDate').valueAsDate = new Date();
+            renderRecords();
+        });
+
+        // မှတ်တမ်းဖျက်ရန် Function
+        function deleteRecord(index) {
+            if (confirm("ဒီမှတ်တမ်းကို ဖျက်မှာ သေချာပါသလား?")) {
+                records.splice(index, 1);
+                localStorage.setItem('work_records', JSON.stringify(records));
+                renderRecords();
+            }
+        }
+
+        // စစချင်း Run ချိန်
+        renderRecords();
+    </script>
+</body>
+</html>
